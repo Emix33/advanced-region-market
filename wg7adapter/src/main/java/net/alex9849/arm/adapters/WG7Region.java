@@ -1,7 +1,13 @@
 package net.alex9849.arm.adapters;
 
+import com.fastasyncworldedit.core.extent.PassthroughExtent;
+import com.sk89q.worldedit.IncompleteRegionException;
+import com.sk89q.worldedit.extent.NullExtent;
+import com.sk89q.worldedit.function.mask.Mask;
 import com.sk89q.worldedit.math.BlockVector2;
 import com.sk89q.worldedit.math.BlockVector3;
+import com.sk89q.worldedit.regions.Polygonal2DRegion;
+import com.sk89q.worldedit.regions.selector.Polygonal2DRegionSelector;
 import com.sk89q.worldguard.domains.DefaultDomain;
 import com.sk89q.worldguard.protection.flags.Flag;
 import com.sk89q.worldguard.protection.flags.RegionGroupFlag;
@@ -177,6 +183,37 @@ public class WG7Region implements WGRegion {
 
     @Override
     public int getVolume() {
+        if(region instanceof ProtectedPolygonalRegion polygonalRegion){
+            //Workaround worldguard bug
+            BlockVector2[] points = polygonalRegion.getPoints().toArray(new BlockVector2[0]);
+
+            return getFakeArea(points) * ((polygonalRegion.getMaximumPoint().getBlockY() - polygonalRegion.getMinimumPoint().getBlockY()) + 1);
+        }
         return region.volume();
+    }
+
+    public int getFakeArea(BlockVector2[] points){
+        ProtectedPolygonalRegion region = new ProtectedPolygonalRegion("test", List.of(points), 1, 1);
+        Polygonal2DRegionSelector selector = new Polygonal2DRegionSelector(null, region.getPoints(),
+                region.getMinimumPoint().getY(), region.getMaximumPoint().getY());
+
+        try {
+            Polygonal2DRegion wregion = selector.getRegion();
+            NullExtent extend = new NullExtent();
+            PassthroughExtent pextent =new PassthroughExtent(extend);
+            return pextent.countBlocks(wregion, new Mask() {
+                @Override
+                public boolean test(BlockVector3 vector) {
+                    return true;
+                }
+
+                @Override
+                public Mask copy() {
+                    return this;
+                }
+            });
+        } catch (IncompleteRegionException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
